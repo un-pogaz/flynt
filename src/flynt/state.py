@@ -17,6 +17,7 @@ class State:
     transform_format: bool = True
     transform_concat: bool = False
     transform_join: bool = False
+    avoid_recursive_string: bool = False
 
     # -- Statistics
     percent_candidates: int = 0

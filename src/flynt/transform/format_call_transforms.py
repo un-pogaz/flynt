@@ -13,6 +13,7 @@ def joined_string(
     fmt_call: ast.Call,
     *,
     aggressive: bool = False,
+    avoid_recursive_string: bool = False,
 ) -> Union[ast.JoinedStr, ast.Str]:
     """Transform a "...".format() call node into a f-string node."""
     assert isinstance(fmt_call.func, ast.Attribute) and isinstance(
@@ -78,7 +79,9 @@ def joined_string(
 
         if suffix:
             ast_name = ast.Attribute(value=ast_name, attr=suffix)
-        new_segments.append(ast_formatted_value(ast_name, fmt_str, conversion))
+        new_segments.append(
+            ast_formatted_value(ast_name, fmt_str, conversion, avoid_recursive_string)
+        )
 
     if var_map and not aggressive:
         raise FlyntException(

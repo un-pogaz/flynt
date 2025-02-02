@@ -107,6 +107,15 @@ def run_flynt_cli(arglist: Optional[List[str]] = None) -> int:
     )
 
     parser.add_argument(
+        "--no-rs",
+        "--no-recursive-string",
+        dest="recursive_string",
+        action="store_false",
+        default=True,
+        help="Don't transform to f-strings if it will result with a recursive string (default: do so)",
+    )
+
+    parser.add_argument(
         "-tc",
         "--transform-concats",
         action="store_true",
@@ -260,4 +269,5 @@ def state_from_args(args) -> State:
         transform_format=args.transform_format,
         transform_join=args.transform_joins,
         transform_percent=args.transform_percent,
+        avoid_recursive_string=(not args.recursive_string),
     )

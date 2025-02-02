@@ -31,6 +31,7 @@ class FstringifyTransformer(ast.NodeTransformer):
             result_node = joined_string(
                 node,
                 aggressive=self.state.aggressive,
+                avoid_recursive_string=self.state.avoid_recursive_string,
             )
             self.visit(result_node)
             self.counter += 1
@@ -72,6 +73,7 @@ class FstringifyTransformer(ast.NodeTransformer):
             result_node = transform_binop(
                 node,
                 aggressive=self.state.aggressive,
+                avoid_recursive_string=self.state.avoid_recursive_string,
             )
             self.counter += 1
             self.state.percent_transforms += 1

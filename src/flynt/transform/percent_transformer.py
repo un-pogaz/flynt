@@ -63,6 +63,7 @@ def formatted_value(
     val: ast.AST,
     *,
     aggressive: bool = False,
+    avoid_recursive_string: bool = False,
 ) -> Union[ast.FormattedValue, ast.Str]:
     if fmt_spec in integer_specificers:
         fmt_prefix = fmt_prefix.replace(".", "0")
@@ -103,6 +104,7 @@ def formatted_value(
             val,
             fmt_str=fmt_prefix,
             conversion=conversion_methods[fmt_spec],
+            avoid_recursive_string=avoid_recursive_string,
         )
     fmt_spec = translate_conversion_types.get(fmt_spec, fmt_spec)
     if fmt_spec == "d":
@@ -118,10 +120,18 @@ def formatted_value(
                 keywords={},
             )
         fmt_spec = ""
-    return ast_formatted_value(val, fmt_str=fmt_prefix + fmt_spec)
+    return ast_formatted_value(
+        val,
+        fmt_str=fmt_prefix + fmt_spec,
+        avoid_recursive_string=avoid_recursive_string,
+    )
 
 
-def transform_dict(node: ast.BinOp, aggressive: bool = False) -> ast.JoinedStr:
+def transform_dict(
+    node: ast.BinOp,
+    aggressive: bool = False,
+    avoid_recursive_string: bool = False,
+) -> ast.JoinedStr:
     """Convert a `BinOp` `%` formatted str with a name representing a Dict on the right to an f-string.
 
     Takes an ast.BinOp representing `"1. %(key1)s 2. %(key2)s" % mydict`
@@ -177,6 +187,7 @@ def transform_dict(node: ast.BinOp, aggressive: bool = False) -> ast.JoinedStr:
                 fmt_str,
                 make_fv(var_key),
                 aggressive=aggressive,
+                avoid_recursive_string=avoid_recursive_string,
             )
             segments.append(fv)
         else:
@@ -186,7 +197,12 @@ def transform_dict(node: ast.BinOp, aggressive: bool = False) -> ast.JoinedStr:
     return ast.JoinedStr(segments)
 
 
-def transform_tuple(node: ast.BinOp, *, aggressive: bool = False) -> ast.JoinedStr:
+def transform_tuple(
+    node: ast.BinOp,
+    *,
+    aggressive: bool = False,
+    avoid_recursive_string: bool = False,
+) -> ast.JoinedStr:
     """Convert a `BinOp` `%` formatted str with a tuple on the right to an f-string.
 
     Takes an ast.BinOp representing `"1. %s 2. %s" % (a, b)`
@@ -216,7 +232,13 @@ def transform_tuple(node: ast.BinOp, *, aggressive: bool = False) -> ast.JoinedS
         fmt_spec = blocks.popleft()
         val = str_vars.popleft()
 
-        fv = formatted_value(fmt_prefix, fmt_spec, val, aggressive=aggressive)
+        fv = formatted_value(
+            fmt_prefix,
+            fmt_spec,
+            val,
+            aggressive=aggressive,
+            avoid_recursive_string=avoid_recursive_string,
+        )
 
         segments.append(fv)
         segments.append(ast_string_node(blocks.popleft().replace("%%", "%")))
@@ -246,6 +268,7 @@ def transform_list(node: ast.BinOp, *, aggressive: bool = False) -> ast.JoinedSt
 def transform_generic(
     node: ast.BinOp,
     aggressive: bool = False,
+    avoid_recursive_string: bool = False,
 ) -> ast.JoinedStr:
     """Convert a `BinOp` `%` formatted str with a unknown name on the `node.right` to an f-string.
 
@@ -262,13 +285,17 @@ def transform_generic(
     assert isinstance(node.left, ast.Str)
     has_dict_str_format = DICT_PATTERN.findall(node.left.s)
     if has_dict_str_format:
-        return transform_dict(node, aggressive=aggressive)
+        return transform_dict(
+            node, aggressive=aggressive, avoid_recursive_string=avoid_recursive_string
+        )
 
     any(isinstance(n, (ast.Str, ast.JoinedStr)) for n in ast.walk(node.right))
 
     # if it's just a name then pretend it's tuple to use that code
     node.right = ast.Tuple(elts=[node.right])
-    return transform_tuple(node, aggressive=aggressive)
+    return transform_tuple(
+        node, aggressive=aggressive, avoid_recursive_string=avoid_recursive_string
+    )
 
 
 supported_operands = [
@@ -286,18 +313,25 @@ def transform_binop(
     node: ast.BinOp,
     *,
     aggressive: bool = False,
+    avoid_recursive_string: bool = False,
 ) -> ast.JoinedStr:
     if isinstance(node.right, tuple(supported_operands)):
-        return transform_generic(node, aggressive=aggressive)
+        return transform_generic(
+            node, aggressive=aggressive, avoid_recursive_string=avoid_recursive_string
+        )
 
     if isinstance(node.right, ast.Tuple):
-        return transform_tuple(node, aggressive=aggressive)
+        return transform_tuple(
+            node, aggressive=aggressive, avoid_recursive_string=avoid_recursive_string
+        )
 
     if isinstance(node.right, ast.List):
         return transform_list(node, aggressive=aggressive)
 
     if isinstance(node.right, ast.Dict):
         # todo adapt transform dict to Dict literal
-        return transform_dict(node, aggressive=aggressive)
+        return transform_dict(
+            node, aggressive=aggressive, avoid_recursive_string=avoid_recursive_string
+        )
 
     raise ConversionRefused(f"Unsupported `node.right` class: {type(node.right)}")

@@ -67,10 +67,20 @@ def str_in_str(node: ast.AST) -> bool:
     return sisv.string_in_string
 
 
+def _has_string_child(node: ast.AST) -> bool:
+    if isinstance(node, ast.Str):
+        return True
+    for child in ast.iter_child_nodes(node):
+        if _has_string_child(child):
+            return True
+    return False
+
+
 def ast_formatted_value(
     val: ast.AST,
     fmt_str: Optional[str] = None,
     conversion: Optional[str] = None,
+    avoid_recursive_string: bool = False,
 ) -> Union[ast.FormattedValue, ast.Str]:
     if isinstance(val, ast.FormattedValue):
         return val
@@ -78,6 +88,11 @@ def ast_formatted_value(
     if ast_to_string(val).startswith("{"):
         raise ConversionRefused(
             "values starting with '{' are better left not transformed.",
+        )
+
+    if avoid_recursive_string and _has_string_child(val):
+        raise ConversionRefused(
+            "Skipping transform that will contain recursive literal string.",
         )
 
     if fmt_str:
